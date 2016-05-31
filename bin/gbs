@@ -1,13 +1,42 @@
 #!/usr/bin/env ruby
 
+require 'rubygems'
+require 'bundler'
+Bundler.require
+
 require 'gbs/scheduler'
 require 'gbs/project_manager'
 require 'gbs/project'
 require 'gbs/userdata'
+require 'gbs/cli_helpers'
+
+Thread.abort_on_exception = true
+
+options = GBS::CLIHelpers.parse_options [
+    %w( -h  --help        Print this help and exit           ),
+    %w( -v  --version     Print version information and exit ),
+    %w( -s  --start       Start the daemon                   ),
+]
+
+ARG_OPTS, ARG_PARAMS = GBS::CLIHelpers.parse_arguments(options, ARGV)
+
+if ARG_OPTS[:version]
+    puts "gbs v0.1.0"
+    exit
+end
+
+if ARG_OPTS[:help] || (ARG_OPTS.empty? && ARG_PARAMS.empty?)
+    GBS::CLIHelpers.send_help(options)
+    exit
+end
+
 
 module GBS
-    Scheduler.init
-    ProjectManager.init
+    if ARG_OPTS[:start] then
+        Scheduler.init
+        ProjectManager.init
 
-    sleep
+        # Process.daemon
+        sleep
+    end
 end

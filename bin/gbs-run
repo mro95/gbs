@@ -4,45 +4,21 @@ require 'gbs/project_manager'
 require 'gbs/project'
 require 'gbs/userdata'
 
-OPTIONS = [
+options = GBS::CLIHelpers.parse_options [
     %w( -h --help       Print this help and exit ),
     %w( -v --version    Print version and exit   ),
     %w( -l --list       List available projects  ),
 ]
-.map do |opt|
-    {
-        short: opt[0],
-        long:  opt[1],
-        desc:  opt[2..-1].join(' '),
-        id:    opt[1][2..-1].to_sym # long opt without dashes
-    }
-end
 
-options = {}
-parameters = ARGV.reject { |arg| arg[0] == '-' }
+ARG_OPTS, ARG_PARAMS = GBS::CLIHelpers.parse_arguments(options, ARGV)
 
-# Parse arguments
-ARGV.select { |arg| arg[0] == '-' }.each do |arg|
-    opt = OPTIONS.find { |opt| opt[:short] == arg || opt[:long] == arg }
-    if opt.nil?
-        puts "Unknown option: #{arg}"
-        exit 1
-    end
-    options[opt[:id]] = true
-end
-
-
-if options[:version]
+if ARG_OPTS[:version]
     puts "gbs-run v0.1.0"
     exit
 end
 
-if options[:help]
-    puts "Usage: #{$0} [options]"
-    puts
-    OPTIONS.each do |opt|
-        puts '  %-2s  %-12s  %s' % [ opt[:short], opt[:long], opt[:desc] ]
-    end
+if ARG_OPTS[:help]
+    GBS::CLIHelpers.send_help(options)
     exit
 end
 
@@ -50,7 +26,39 @@ end
 module GBS
     ProjectManager.init
 
-    ProjectManager.projects.each do |project|
-        puts project.name
+    if ARG_OPTS[:list]
+        ProjectManager.projects.each do |project|
+            puts project.name
+        end
+
+        exit
+    end
+
+    if ARG_PARAMS.length == 0
+        send_help
+        exit
+    end
+
+    # Find project by name
+    project = ProjectManager[ARG_PARAMS[0]]
+
+    if project.nil?
+        warn "Project #{ARG_PARAMS[0]} not found."
+        exit 1
+    end
+
+    if ARG_PARAMS.length == 1
+        puts "Tasks for project #{project.name}:"
+        project.tasks.each do |name, task|
+            puts "- #{name}"
+        end
+
+        exit
+    end
+
+    # Run specified tasks
+    ARG_PARAMS[1..-1].each do |param|
+        puts "Running task :#{param} for #{project.name}..."
+        project.tasks[param.to_sym].run
     end
 end
