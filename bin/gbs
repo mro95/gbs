@@ -9,6 +9,7 @@ require 'gbs/project_manager'
 require 'gbs/project'
 require 'gbs/userdata'
 require 'gbs/cli_helpers'
+require 'gbs/environment'
 
 Thread.abort_on_exception = true
 
@@ -33,10 +34,14 @@ end
 
 module GBS
     if ARG_OPTS[:start] then
-        Scheduler.init
         ProjectManager.init
+        # Scheduler.init
+
+        proj = ProjectManager.projects.first
+        env = LocalEnvironment.new
+        proj.prepare_workspace(env)
 
         # Process.daemon
-        sleep
+        # sleep
     end
 end

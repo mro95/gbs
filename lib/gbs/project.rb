@@ -2,23 +2,27 @@ require 'fileutils'
 
 module GBS
     class Project
-        attr_reader :repositories, :tasks
+        attr_reader :repositories, :tasks, :schedules
         attr_accessor :name
 
         def initialize
             @name = ''
             @repositories = []
             @tasks = {}
+            @schedules = []
+        end
+
+        def prepare_workspace(env)
+            env.exec %W( mkdir -p #{workspace_directory} )
+
+            FileUtils.cd(workspace_directory) do
+                @repositories.each { |r| r.setup(env) }
+            end
         end
 
         # Run a task
         def run(task_name)
-            create_workspace
-
-            FileUtils.cd(workspace_directory) do
-                @repositories.each { |r| r.setup }
-                @tasks[task_name].run
-            end
+            @tasks[task_name].run
         end
 
         # Get the path to the directory where this project is built.
@@ -26,9 +30,11 @@ module GBS
             Userdata.workspace_directory(@name)
         end
 
-        # Create the directory that will be used to build this project
-        def create_workspace
-            FileUtils.mkdir_p(workspace_directory)
+        # Calls Scheduler::register for every schedule in this project
+        def register_schedules
+            @schedules.each do |s|
+                Scheduler.register(@project, s.specifier, s.block)
+            end
         end
     end
 
@@ -53,7 +59,10 @@ module GBS
         end
 
         def schedule(specifier, &block)
-            Scheduler.register(@project, specifier, &block)
+            @project.schedules << {
+                specifier: specifier,
+                block: block
+            }
         end
     end
 
@@ -89,12 +98,11 @@ module GBS
             @path = path
         end
 
-        def setup
-            # TODO: Use popen3
-            system "git init"
-            system "git config remote.origin.url #{@path}"
-            system "git fetch --tags origin master"
-            system "git pull origin"
+        def setup(env)
+            env.exec %W( git init )
+            env.exec %W( git config remote.origin.url #{@path} )
+            env.exec %W( git fetch --tags origin master )
+            env.exec %W( git pull origin )
         end
     end
 end

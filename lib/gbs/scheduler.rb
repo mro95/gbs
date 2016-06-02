@@ -22,8 +22,8 @@ module GBS
             end
         end
 
-        def self.register(project, specifier, &block)
-            @events << EventProxy.new(project, specifier, &block).event
+        def self.register(project, specifier, proc)
+            @events << EventProxy.new(project, specifier, proc).event
         end
 
         class Event

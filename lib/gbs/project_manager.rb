@@ -2,7 +2,6 @@ module GBS
     module ProjectManager
         def self.init
             @projects = Userdata.projects
-            Scheduler.start
         end
 
         def self.projects
