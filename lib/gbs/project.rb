@@ -14,10 +14,9 @@ module GBS
 
         def prepare_workspace(env)
             env.exec %W( mkdir -p #{workspace_directory} )
+            env.cd(workspace_directory)
 
-            FileUtils.cd(workspace_directory) do
-                @repositories.each { |r| r.setup(env) }
-            end
+            @repositories.each { |r| r.setup(env) }
         end
 
         # Run a task
@@ -94,13 +93,13 @@ module GBS
     end
 
     class GitRepository
-        def initialize(path)
-            @path = path
+        def initialize(remote)
+            @remote = remote
         end
 
         def setup(env)
             env.exec %W( git init )
-            env.exec %W( git config remote.origin.url #{@path} )
+            env.exec %W( git config remote.origin.url #{@remote} )
             env.exec %W( git fetch --tags origin master )
             env.exec %W( git pull origin )
         end

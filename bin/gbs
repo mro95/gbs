@@ -39,7 +39,8 @@ module GBS
 
         proj = ProjectManager.projects.first
         env = LocalEnvironment.new
-        proj.prepare_workspace(env)
+        renv = RemoteEnvironment.new(env, 'nv')
+        proj.prepare_workspace(renv)
 
         # Process.daemon
         # sleep
