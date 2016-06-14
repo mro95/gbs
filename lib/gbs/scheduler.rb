@@ -23,23 +23,21 @@ module GBS
         end
 
         def self.register(project, specifier, proc)
-            @events << EventProxy.new(project, specifier, proc).event
+            @events << Event.new(project, specifier, proc)
         end
 
         class Event
             attr_reader :actions, :schedule, :project
 
-            def initialize(project, specifier)
+            def initialize(project, specifier, proc)
                 @project = project
                 @specifier = specifier
                 @schedule = CronParser.new(specifier)
-                @actions = []
+                @proc = proc
             end
 
             def run
-                @actions.each do |block|
-                    instance_eval(&block)
-                end
+                EventRunner.new(@project, @proc)
             end
 
             def inspect
@@ -47,16 +45,16 @@ module GBS
             end
         end
 
-        class EventProxy
+        class EventRunner
             attr_reader :event
 
-            def initialize(project, specifier, &block)
-                @event = Event.new(project, specifier)
+            def initialize(project, block)
+                @project = project
                 instance_eval(&block)
             end
 
             def run(task)
-                @event.actions << Proc.new { project.run(task) }
+                @project.run(EnvironmentManager.best_available, task)
             end
         end
     end

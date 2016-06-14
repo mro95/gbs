@@ -2,6 +2,7 @@ module GBS
     module ProjectManager
         def self.init
             @projects = Userdata.projects
+            @projects.each(&:register_schedules)
         end
 
         def self.projects

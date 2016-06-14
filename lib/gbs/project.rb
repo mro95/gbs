@@ -17,11 +17,15 @@ module GBS
             env.cd(workspace_directory)
 
             @repositories.each { |r| r.setup(env) }
+
+            env.prepared_project(@name)
         end
 
         # Run a task
-        def run(task_name)
-            @tasks[task_name].run
+        def run(env, task_name)
+            prepare_workspace(env) unless env.prepared_project?(@name)
+
+            @tasks[task_name].run(env)
         end
 
         # Get the path to the directory where this project is built.
@@ -32,7 +36,7 @@ module GBS
         # Calls Scheduler::register for every schedule in this project
         def register_schedules
             @schedules.each do |s|
-                Scheduler.register(@project, s.specifier, s.block)
+                Scheduler.register(self, s[:specifier], s[:block])
             end
         end
     end
@@ -54,7 +58,7 @@ module GBS
         end
 
         def task(name, &block)
-            @project.tasks[name] = TaskProxy.new(&block).task
+            @project.tasks[name] = Task.new(self, block)
         end
 
         def schedule(specifier, &block)
@@ -68,27 +72,29 @@ module GBS
     class Task
         attr_reader :actions
 
-        def initialize
-            @actions = []
+        def initialize(project, block)
+            @project = project
+            @block = block
         end
 
-        def run
-            @actions.each(&:call)
+        def run(env)
+            TaskRunner.new(@project, env, @block)
         end
     end
 
-    class TaskProxy
-        attr_reader :task
-
-        def initialize(&block)
-            @task = Task.new
+    class TaskRunner
+        def initialize(project, env, block)
+            @project = project
+            @env = env
             instance_eval(&block)
         end
 
-        def shell(str)
-            @task.actions << lambda do
-                system str
-            end
+        def `(string)
+            @env.shell_return(string)
+        end
+
+        def shell(args)
+            @env.exec(args)
         end
     end
 

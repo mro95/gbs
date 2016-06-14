@@ -2,8 +2,38 @@ require 'open3'
 require 'shellwords'
 
 module GBS
-    class LocalEnvironment
+    class Environment
         def initialize
+            @prepared = {}
+        end
+
+        def prepared_project?(project_name)
+            @prepared[project_name] == true
+        end
+
+        def prepared_project(project_name, bool = true)
+            @prepared[project_name] = bool
+        end
+
+        def load
+            exec_return(%W( uptime )).split(' ')[-3..-1].map(&:to_f)
+        end
+
+        def exec_return(args)
+            exec(args) do |out, err|
+                return ((out + err).sort_by(&:first)).map(&:last).join("\n")
+            end
+        end
+
+        def shell_return(string)
+            exec_return %W( bash -c #{string.shellescape} )
+        end
+    end
+
+    class LocalEnvironment < Environment
+        def initialize
+            super()
+
             @cwd = Dir.pwd
         end
 
@@ -41,16 +71,20 @@ module GBS
                     end
 
                     puts thread.value
+
+                    return yield(outbuf, errbuf) if block_given?
                 end
             end
         end
     end
 
-    class RemoteEnvironment
+    class RemoteEnvironment < Environment
         def initialize(base, remote)
+            super()
+
             @base = base
             @remote = remote
-            @cwd = '/'
+            @cwd = '.'
         end
 
         def cd(dir)
@@ -58,9 +92,9 @@ module GBS
         end
 
         # This approach has about 20ms overhead per command
-        def exec(argv)
-            sshcmd = %W( ssh #{@remote} -S foo cd #{@cwd} && )
-            @base.exec(sshcmd + argv)
+        def exec(argv, &block)
+            sshcmd = %W( ssh #{@remote} -S foo-#{@remote} cd #{@cwd} && )
+            @base.exec(sshcmd + argv, &block)
         end
     end
 end
