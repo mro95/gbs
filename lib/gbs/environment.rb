@@ -76,13 +76,17 @@ module GBS
                 end
             end
         end
+
+        def retrieve(remote, lcoal)
+            FileUtils.cp(remote, local)
+        end
     end
 
     class RemoteEnvironment < Environment
-        def initialize(base, remote)
+        def initialize(local, remote)
             super()
 
-            @base = base
+            @local = local
             @remote = remote
             @cwd = '.'
         end
@@ -94,7 +98,11 @@ module GBS
         # This approach has about 20ms overhead per command
         def exec(argv, &block)
             sshcmd = %W( ssh #{@remote} -S foo-#{@remote} cd #{@cwd} && )
-            @base.exec(sshcmd + argv, &block)
+            @local.exec(sshcmd + argv, &block)
+        end
+
+        def retrieve(remote, local)
+            @local.exec %W( scp #{@remote}:#{@cwd}/#{remote} #{local} )
         end
     end
 end

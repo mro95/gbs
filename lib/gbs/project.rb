@@ -28,9 +28,14 @@ module GBS
             @tasks[task_name].run(env)
         end
 
+        # Get the path to the directory where artifacts from this project are stored.
+        def artifact_directory
+            "#{ENV['HOME']}/.local/share/gbs/artifacts/#{@name}"
+        end
+
         # Get the path to the directory where this project is built.
         def workspace_directory
-            Userdata.workspace_directory(@name)
+            "#{ENV['HOME']}/.local/share/gbs/workspaces/#{@name}"
         end
 
         # Calls Scheduler::register for every schedule in this project
@@ -58,7 +63,7 @@ module GBS
         end
 
         def task(name, &block)
-            @project.tasks[name] = Task.new(self, block)
+            @project.tasks[name] = Task.new(@project, block)
         end
 
         def schedule(specifier, &block)
@@ -95,6 +100,11 @@ module GBS
 
         def shell(args)
             @env.exec(args)
+        end
+
+        def artifact(filename, artifact_filename = "#{filename}-#{`git describe --tags`.chomp}")
+            FileUtils.mkdir_p(@project.artifact_directory)
+            @env.retrieve(filename, "#{@project.artifact_directory}/#{artifact_filename}")
         end
     end
 
