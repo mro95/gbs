@@ -22,39 +22,26 @@ module GBS
             end
         end
 
-        def self.register(project, specifier, proc)
-            @events << Event.new(project, specifier, proc)
+        def self.register(project, specifier, task)
+            @events << Event.new(project, specifier, task)
         end
 
         class Event
             attr_reader :actions, :schedule, :project
 
-            def initialize(project, specifier, proc)
+            def initialize(project, specifier, task)
                 @project = project
                 @specifier = specifier
                 @schedule = CronParser.new(specifier)
-                @proc = proc
+                @task = task
             end
 
             def run
-                EventRunner.new(@project, @proc)
+                @project.run(EnvironmentManager.best_available, @task)
             end
 
             def inspect
                 "#{@project.name} event scheduled at #{@specifier}, next run at #{@schedule.next}"
-            end
-        end
-
-        class EventRunner
-            attr_reader :event
-
-            def initialize(project, block)
-                @project = project
-                instance_eval(&block)
-            end
-
-            def run(task)
-                @project.run(EnvironmentManager.best_available, task)
             end
         end
     end

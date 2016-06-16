@@ -4,13 +4,14 @@ require 'rubygems'
 require 'bundler'
 Bundler.require
 
-require 'gbs/scheduler'
-require 'gbs/project_manager'
-require 'gbs/project'
-require 'gbs/userdata'
 require 'gbs/cli_helpers'
 require 'gbs/environment'
 require 'gbs/environment_manager'
+require 'gbs/project'
+require 'gbs/project_manager'
+require 'gbs/rpc/server'
+require 'gbs/scheduler'
+require 'gbs/userdata'
 
 Thread.abort_on_exception = true
 
@@ -18,6 +19,7 @@ options = GBS::CLIHelpers.parse_options [
     %w( -h  --help        Print this help and exit           ),
     %w( -v  --version     Print version information and exit ),
     %w( -s  --start       Start the daemon                   ),
+    %w( -x  --stop        Stop the daemon                    ),
 ]
 
 ARG_OPTS, ARG_PARAMS = GBS::CLIHelpers.parse_arguments(options, ARGV)
@@ -27,7 +29,7 @@ if ARG_OPTS[:version]
     exit
 end
 
-if ARG_OPTS[:help] || (ARG_OPTS.empty? && ARG_PARAMS.empty?)
+if ARG_OPTS[:help]
     GBS::CLIHelpers.send_help(options)
     exit
 end
@@ -41,7 +43,32 @@ module GBS
 
         Scheduler.start
 
+        @server = RPC::Server.new
+
         # Process.daemon
         sleep
+
+        exit
     end
+
+    # Client actions
+
+    @gbs = RPC::Client.new
+
+    if ARG_OPTS[:stop] then
+        @gbs.exit
+        exit
+    end
+
+    # Show project overview
+
+    projects = @gbs.get_projects.map do |project|
+        name = project[:name].blue.bold
+        last_build = "#{Time.parse(project[:last_build]).sec + Time.now.sec}s ago".yellow
+
+        [ name, last_build ]
+    end
+
+    puts "Projects"
+    puts CLIHelpers.tabularize(projects, minsizes: [ 16, 16 ]).join("\n").indent(4)
 end

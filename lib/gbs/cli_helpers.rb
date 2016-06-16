@@ -34,5 +34,46 @@ module GBS
 
             [ out.to_h, ARGV.reject { |arg| arg[0] == '-' } ]
         end
+
+        def self.tabularize(table, options = {})
+            colsizes = table.transpose.map { |n| n.map(&:length_term).max }
+
+            if options[:minsizes]
+                colsizes = colsizes.zip(options[:minsizes]).map(&:max)
+            end
+
+            table.map { |row| row.each_with_index.map { |cell, i| cell.ljust_term(colsizes[i]) }.join }
+        end
+    end
+end
+
+class String
+    # Helper string format methods
+
+    # Define String#red, etc for colored terminal output
+    %i(black red green yellow blue magenta cyan white).each_with_index do |name, index|
+        define_method name do
+            "\e[3#{index}m#{self}\e[0m"
+        end
+    end
+
+    def bold
+        "\e[1m#{self}\e[0m"
+    end
+
+    def indent(num)
+        self.lines.map { |line| ' ' * num + line }.join
+    end
+
+    # Version of #length that ignores terminal escape sequences
+    def length_term
+        self.gsub(/\e\[[^m]*m/, '').length
+    end
+
+    # Version of #ljust that ignores terminal escape sequences
+    def ljust_term(num)
+        padding = (num - length_term)
+        return self if padding <= 0
+        self + ' ' * padding
     end
 end

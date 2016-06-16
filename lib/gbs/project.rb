@@ -24,6 +24,7 @@ module GBS
         # Run a task
         def run(env, task_name)
             prepare_workspace(env) unless env.prepared_project?(@name)
+            env.cd(workspace_directory)
 
             @tasks[task_name].run(env)
         end
@@ -41,7 +42,7 @@ module GBS
         # Calls Scheduler::register for every schedule in this project
         def register_schedules
             @schedules.each do |s|
-                Scheduler.register(self, s[:specifier], s[:block])
+                Scheduler.register(self, s[:specifier], s[:task])
             end
         end
     end
@@ -66,10 +67,10 @@ module GBS
             @project.tasks[name] = Task.new(@project, block)
         end
 
-        def schedule(specifier, &block)
+        def schedule(specifier, task)
             @project.schedules << {
                 specifier: specifier,
-                block: block
+                task: task
             }
         end
     end

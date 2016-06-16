@@ -20,7 +20,7 @@ module GBS
         end
 
         def exec_return(args)
-            exec(args) do |out, err|
+            exec(args) do |out, err, exitstatus|
                 return ((out + err).sort_by(&:first)).map(&:last).join("\n")
             end
         end
@@ -72,7 +72,8 @@ module GBS
 
                     puts thread.value
 
-                    return yield(outbuf, errbuf) if block_given?
+                    return yield(outbuf, errbuf, thread.value.exitstatus) if block_given?
+                    return thread.value.exitstatus
                 end
             end
         end
