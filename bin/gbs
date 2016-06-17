@@ -5,13 +5,7 @@ require 'bundler'
 Bundler.require
 
 require 'gbs/cli_helpers'
-require 'gbs/environment'
-require 'gbs/environment_manager'
-require 'gbs/project'
-require 'gbs/project_manager'
 require 'gbs/rpc/server'
-require 'gbs/scheduler'
-require 'gbs/userdata'
 
 Thread.abort_on_exception = true
 
@@ -37,6 +31,15 @@ end
 
 module GBS
     if ARG_OPTS[:start] then
+        require 'gbs/environment'
+        require 'gbs/environment_manager'
+        require 'gbs/logger'
+        require 'gbs/project'
+        require 'gbs/project_manager'
+        require 'gbs/scheduler'
+        require 'gbs/userdata'
+
+        Logger.init
         Scheduler.init
         ProjectManager.init
         EnvironmentManager.init
@@ -47,6 +50,9 @@ module GBS
 
         # Process.daemon
         sleep
+
+        Logger.finish
+        # @server.stop
 
         exit
     end

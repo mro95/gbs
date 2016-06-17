@@ -35,7 +35,8 @@ module GBS
             end
 
             def cmd_exit
-                exit
+                Thread.main.wakeup
+                { status: 'ok' }
             end
         end
 
@@ -52,7 +53,7 @@ module GBS
 
                         json = { cmd: cmd, args: args }.to_json
                         @socket.puts(json)
-                        JSON.parse(@socket.gets, symbolize_names: true) unless cmd == 'exit'
+                        JSON.parse(@socket.gets, symbolize_names: true)
                     end
                 end
             end

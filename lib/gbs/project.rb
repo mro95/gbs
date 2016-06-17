@@ -31,12 +31,12 @@ module GBS
 
         # Get the path to the directory where artifacts from this project are stored.
         def artifact_directory
-            "#{ENV['HOME']}/.local/share/gbs/artifacts/#{@name}"
+            "#{Userdata.data_path}/artifacts/#{@name}"
         end
 
         # Get the path to the directory where this project is built.
         def workspace_directory
-            "#{ENV['HOME']}/.local/share/gbs/workspaces/#{@name}"
+            "#{Userdata.data_path}/workspaces/#{@name}"
         end
 
         # Calls Scheduler::register for every schedule in this project
@@ -92,7 +92,9 @@ module GBS
         def initialize(project, env, block)
             @project = project
             @env = env
+            @build = Logger.new_build(project, env)
             instance_eval(&block)
+            @build.finish
         end
 
         def `(string)
@@ -100,7 +102,11 @@ module GBS
         end
 
         def shell(args)
-            @env.exec(args)
+            started = Time.now
+            @env.exec(args) do |out, err, exitstatus|
+                duration = Time.now - started
+                @build.log_command(started, duration, args, out, err, exitstatus)
+            end
         end
 
         def artifact(filename, artifact_filename = "#{filename}-#{`git describe --tags`.chomp}")

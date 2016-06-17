@@ -11,8 +11,8 @@ module GBS
             "#{ENV['HOME']}/.config/gbs"
         end
 
-        def self.workspace_directory(project_name)
-            "#{ENV['HOME']}/.local/share/gbs/workspaces/#{project_name}"
+        def self.data_path
+            "#{ENV['HOME']}/.local/share/gbs"
         end
     end
 end

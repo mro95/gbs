@@ -5,8 +5,6 @@ module GBS
         end
 
         def self.start
-            puts "Starting Scheduler thread..."
-
             @timer = Thread.new do
                 loop do
                     next_run = @events.group_by do |event|
@@ -14,6 +12,7 @@ module GBS
                     end.min_by(&:first)
 
                     puts "Waiting #{next_run.first} seconds to run #{next_run.last.map{|n| n.project.name }.join(', ')}"
+                    puts "RAM usage: " + `pmap #{Process.pid} | tail -1`[10,40].strip
 
                     sleep next_run.first
 

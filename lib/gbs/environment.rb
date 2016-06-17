@@ -37,6 +37,10 @@ module GBS
             @cwd = Dir.pwd
         end
 
+        def name
+            :local
+        end
+
         def cd(dir)
             @cwd = dir
         end
@@ -45,7 +49,7 @@ module GBS
             FileUtils.cd(@cwd) do
                 Open3.popen3(*argv) do |stdin, stdout, stderr, thread|
                     start = Time.now
-                    puts "pid #{thread.pid} cwd #{@cwd}: #{argv.shelljoin}"
+                    Logger.puts "pid #{thread.pid} cwd #{@cwd}: #{argv.shelljoin}"
                     stdin.close
                     stdout.sync = true
                     stderr.sync = true
@@ -63,14 +67,14 @@ module GBS
                                     desc = (io == stdout) ? 'out' : 'err'
 
                                     buf << [ time, line ]
-                                    puts "[%12.6f] %s: %s" % [ time, desc, line ]
+                                    Logger.puts "[%12.6f] %s: %s" % [ time, desc, line ]
                                 end
                             end
                         end
                     rescue EOFError => e
                     end
 
-                    puts thread.value
+                    Logger.puts thread.value
 
                     return yield(outbuf, errbuf, thread.value.exitstatus) if block_given?
                     return thread.value.exitstatus
@@ -90,6 +94,10 @@ module GBS
             @local = local
             @remote = remote
             @cwd = '.'
+        end
+
+        def name
+            @remote
         end
 
         def cd(dir)
