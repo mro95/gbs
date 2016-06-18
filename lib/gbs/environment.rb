@@ -109,9 +109,13 @@ module GBS
             @cwd = dir
         end
 
+        def controlsocket
+            Userdata.data_path("/controlsockets/#{@remote}")
+        end
+
         # This approach has about 20ms overhead per command
         def exec(argv, &block)
-            sshcmd = %W( ssh #{@remote} -S foo-#{@remote} cd #{@cwd} && )
+            sshcmd = %W( ssh #{@remote} -S #{controlsocket} cd #{@cwd} && )
             @local.exec(sshcmd + argv, &block)
         end
 
