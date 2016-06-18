@@ -4,7 +4,7 @@ require 'fileutils'
 module GBS
     module Logger
         def self.init
-            FileUtils.mkdir_p("#{Userdata.data_path}/logs")
+            FileUtils.mkdir_p("#{Userdata.data_path}/logs/builds")
             @main = File.open("#{Userdata.data_path}/logs/#{Time.now.strftime('%Y-%m-%d-%H-%M')}-gbs.log", 'w')
         end
 
@@ -23,10 +23,15 @@ module GBS
         class Build
             def initialize(project, env)
                 @start = Time.now
-                @file = File.open("#{Userdata.data_path}/logs/#{@start.strftime('%Y-%m-%d-%H-%M')}" +
+                @file = File.open("#{Userdata.data_path}/logs/builds/#{@start.strftime('%Y-%m-%d-%H-%M')}" +
                                   "-#{env.name}-#{project.name}.log", 'w')
 
-                @file.puts "Build started on #{Time.now}"
+                @file.puts "Build started on: #{Time.now}"
+
+                @file.write "Build result: "
+                @resultpos = @file.pos
+                @file.puts "       " # leave some space to write 'success' or 'failure'
+
                 @file.puts "Project: #{project.name}"
                 @file.puts "Environment: #{env.name}"
             end
@@ -41,7 +46,9 @@ module GBS
                 @file.puts "ret [%12.6f] exit %i" % [ duration, exitstatus ]
             end
 
-            def finish
+            def finish(status)
+                @file.seek(@resultpos)
+                @file.write(status.to_s[0..7])
                 @file.close
             end
         end

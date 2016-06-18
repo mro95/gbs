@@ -4,19 +4,19 @@ require 'rubygems'
 require 'bundler'
 Bundler.require
 
-require 'gbs/cli_helpers'
+require 'gbs/utils'
 require 'gbs/rpc/server'
 
 Thread.abort_on_exception = true
 
-options = GBS::CLIHelpers.parse_options [
+options = GBS::Utils.parse_options [
     %w( -h  --help        Print this help and exit           ),
     %w( -v  --version     Print version information and exit ),
     %w( -s  --start       Start the daemon                   ),
     %w( -x  --stop        Stop the daemon                    ),
 ]
 
-ARG_OPTS, ARG_PARAMS = GBS::CLIHelpers.parse_arguments(options, ARGV)
+ARG_OPTS, ARG_PARAMS = GBS::Utils.parse_arguments(options, ARGV)
 
 if ARG_OPTS[:version]
     puts "gbs v0.1.0"
@@ -24,13 +24,15 @@ if ARG_OPTS[:version]
 end
 
 if ARG_OPTS[:help]
-    GBS::CLIHelpers.send_help(options)
+    GBS::Utils.send_help(options)
     exit
 end
 
 
 module GBS
     if ARG_OPTS[:start] then
+        Process.daemon(true, true)
+
         require 'gbs/environment'
         require 'gbs/environment_manager'
         require 'gbs/logger'
@@ -39,6 +41,7 @@ module GBS
         require 'gbs/scheduler'
         require 'gbs/userdata'
 
+        Userdata.create_directories
         Logger.init
         Scheduler.init
         ProjectManager.init
@@ -48,13 +51,13 @@ module GBS
 
         @server = RPC::Server.new
 
-        # Process.daemon
         sleep
 
         Logger.finish
-        # @server.stop
+        ProjectManager.finish
+        @server.stop
 
-        exit
+        Process.exit
     end
 
     # Client actions
@@ -63,18 +66,63 @@ module GBS
 
     if ARG_OPTS[:stop] then
         @gbs.exit
-        exit
+        Process.exit
     end
 
-    # Show project overview
+
+    environments = @gbs.get_environments.map do |env|
+        loadavg = "%4.2f" % env[:loadavg][1]
+        load_max = env[:load_max]
+        loadavg_percent = (env[:loadavg][1] / load_max * 100).to_i
+        loadavg_color = (loadavg_percent < 40) ? :green :
+                        (loadavg_percent < 70) ? :yellow : :red
+
+        [
+            env[:name].blue.bold,
+            ("%3d%%" % [ loadavg_percent ]).send(loadavg_color),
+            "#{loadavg} / #{load_max}".cyan
+        ]
+    end
 
     projects = @gbs.get_projects.map do |project|
         name = project[:name].blue.bold
-        last_build = "#{Time.parse(project[:last_build]).sec + Time.now.sec}s ago".yellow
 
-        [ name, last_build ]
+        history = Array.new(5) + project[:history]
+        history.shift while history.count > 5
+        history.map! { |n| n.to_sym unless n.nil? }
+        history.map! do |n|
+            {
+                nil =>   '-'.black.bold,
+                failure: 'x'.red.bold,
+                success: 'o'.green.bold
+            }[n]
+        end
+
+        last_build = project[:last_build].nil? ? "no builds yet".red
+                   : Utils.time_ago(Time.parse(project[:last_build])).yellow
+
+        [ name, history.join(' '), last_build ]
     end
 
+    builds = @gbs.get_recent_builds.map do |build|
+        build[:start] = Time.parse(build[:start])
+        result_color = build[:result] == 'success' ? :green
+                     : build[:result] == 'failure' ? :red : :yellow
+
+        [
+            build[:project].blue.bold,
+            build[:result].send(result_color).bold,
+            Utils.time_ago(build[:start]).yellow,
+            build[:env].cyan
+        ]
+    end
+
+    puts "Environments"
+    puts Utils.tabularize(environments, minsizes: [ 16, 4 ]).join("\n").indent(4)
+    puts
     puts "Projects"
-    puts CLIHelpers.tabularize(projects, minsizes: [ 16, 16 ]).join("\n").indent(4)
+    puts Utils.tabularize(projects, minsizes: [ 16, 9 ]).join("\n").indent(4)
+    puts
+    puts "Recent builds"
+    puts Utils.tabularize(builds, minsizes: [ 16 ]).join("\n").indent(4)
 end

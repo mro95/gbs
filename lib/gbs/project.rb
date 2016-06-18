@@ -2,7 +2,7 @@ require 'fileutils'
 
 module GBS
     class Project
-        attr_reader :repositories, :tasks, :schedules
+        attr_reader :repositories, :tasks, :schedules, :data
         attr_accessor :name
 
         def initialize
@@ -10,6 +10,25 @@ module GBS
             @repositories = []
             @tasks = {}
             @schedules = []
+            @data = {
+                last_build: nil,
+                last_success: nil,
+                last_failure: nil,
+                history: []
+            }
+        end
+
+        def read_data
+            return unless File.exist?(data_path)
+
+            d = Marshal.load(File.read(data_path))
+            @data.keys.each do |key|
+                @data[key] = d[key] if d.has_key?(key)
+            end
+        end
+
+        def write_data
+            File.write(data_path, Marshal.dump(@data))
         end
 
         def prepare_workspace(env)
@@ -26,7 +45,20 @@ module GBS
             prepare_workspace(env) unless env.prepared_project?(@name)
             env.cd(workspace_directory)
 
-            @tasks[task_name].run(env)
+            result = @tasks[task_name].run(env)
+
+            @data[:last_build] = Time.now
+
+            @data[:last_success] = Time.now if result.status == :success
+            @data[:last_failure] = Time.now if result.status == :failure
+
+            @data[:history] << result.status
+            @data[:history].unshift if @data[:history].count > 5
+        end
+
+        # Get the path to where project data will be stored
+        def data_path
+            "#{Userdata.data_path}/projects/#{@name}.bin"
         end
 
         # Get the path to the directory where artifacts from this project are stored.
@@ -57,6 +89,7 @@ module GBS
 
         def name(arg)
             @project.name = arg
+            @project.read_data
         end
 
         def git(path)
@@ -88,13 +121,25 @@ module GBS
         end
     end
 
+    class TaskFailed < RuntimeError; end
+
     class TaskRunner
+        attr_reader :status
+
         def initialize(project, env, block)
             @project = project
             @env = env
             @build = Logger.new_build(project, env)
-            instance_eval(&block)
-            @build.finish
+            @status = nil
+
+            begin
+                instance_eval(&block)
+                @status = :success
+            rescue TaskFailed
+                @status = :failure
+            end
+
+            @build.finish(@status)
         end
 
         def `(string)
@@ -106,6 +151,7 @@ module GBS
             @env.exec(args) do |out, err, exitstatus|
                 duration = Time.now - started
                 @build.log_command(started, duration, args, out, err, exitstatus)
+                raise TaskFailed if exitstatus != 0
             end
         end
 

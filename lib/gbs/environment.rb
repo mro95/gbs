@@ -3,8 +3,13 @@ require 'shellwords'
 
 module GBS
     class Environment
+        attr_reader :loadavg, :load_max
+
         def initialize
             @prepared = {}
+            @load_max = exec_return(%W( nproc )).to_i
+
+            update_loadavg
         end
 
         def prepared_project?(project_name)
@@ -15,8 +20,8 @@ module GBS
             @prepared[project_name] = bool
         end
 
-        def load
-            exec_return(%W( uptime )).split(' ')[-3..-1].map(&:to_f)
+        def update_loadavg
+            @loadavg = exec_return(%W( uptime )).split(' ')[-3..-1].map(&:to_f)
         end
 
         def exec_return(args)
@@ -32,9 +37,9 @@ module GBS
 
     class LocalEnvironment < Environment
         def initialize
-            super()
-
             @cwd = Dir.pwd
+
+            super()
         end
 
         def name
@@ -89,11 +94,11 @@ module GBS
 
     class RemoteEnvironment < Environment
         def initialize(local, remote)
-            super()
-
             @local = local
             @remote = remote
             @cwd = '.'
+
+            super()
         end
 
         def name

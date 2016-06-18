@@ -4,13 +4,13 @@ require 'gbs/project_manager'
 require 'gbs/project'
 require 'gbs/userdata'
 
-options = GBS::CLIHelpers.parse_options [
+options = GBS::Utils.parse_options [
     %w( -h --help       Print this help and exit ),
     %w( -v --version    Print version and exit   ),
     %w( -l --list       List available projects  ),
 ]
 
-ARG_OPTS, ARG_PARAMS = GBS::CLIHelpers.parse_arguments(options, ARGV)
+ARG_OPTS, ARG_PARAMS = GBS::Utils.parse_arguments(options, ARGV)
 
 if ARG_OPTS[:version]
     puts "gbs-run v0.1.0"
@@ -18,7 +18,7 @@ if ARG_OPTS[:version]
 end
 
 if ARG_OPTS[:help]
-    GBS::CLIHelpers.send_help(options)
+    GBS::Utils.send_help(options)
     exit
 end
 

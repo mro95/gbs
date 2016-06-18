@@ -7,12 +7,16 @@ module GBS
             end
         end
 
-        def self.config_path
-            "#{ENV['HOME']}/.config/gbs"
+        def self.config_path(cont = '')
+            "#{ENV['HOME']}/.config/gbs" + cont
         end
 
-        def self.data_path
-            "#{ENV['HOME']}/.local/share/gbs"
+        def self.data_path(cont = '')
+            "#{ENV['HOME']}/.local/share/gbs" + cont
+        end
+
+        def self.create_directories
+            FileUtils.mkdir_p("#{data_path}/projects")
         end
     end
 end

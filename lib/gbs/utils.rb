@@ -1,5 +1,5 @@
 module GBS
-    module CLIHelpers
+    module Utils
         def self.parse_options(options)
             options.map do |opt|
                 opt.unshift('') if opt[0][0..1] == '--' # short opt optional
@@ -39,10 +39,26 @@ module GBS
             colsizes = table.transpose.map { |n| n.map(&:length_term).max }
 
             if options[:minsizes]
-                colsizes = colsizes.zip(options[:minsizes]).map(&:max)
+                colsizes = colsizes.zip(options[:minsizes]).map(&:compact).map(&:max)
             end
 
-            table.map { |row| row.each_with_index.map { |cell, i| cell.ljust_term(colsizes[i]) }.join }
+            padding = options[:padding] || 2
+
+            table.map { |row| row.each_with_index.map { |cell, i| cell.ljust_term(colsizes[i]) }.join(' ' * padding) }
+        end
+
+        def self.time_ago(time)
+            delta = Time.now - time
+
+            days    = ( delta / (60 * 60 * 24) ).to_i
+            hours   = ( delta / (60 * 60) % 24 ).to_i
+            minutes = ( delta / (60)      % 60 ).to_i
+            seconds = ( delta             % 60 ).to_i
+
+            (delta < 60          ) ? "#{seconds}s ago" :
+            (delta < 60 * 60     ) ? "#{minutes}m #{seconds}s ago" :
+            (delta < 60 * 60 * 24) ? "#{hours}h #{minutes}m ago" :
+                                     "#{days}d #{hours}h ago"
         end
     end
 end

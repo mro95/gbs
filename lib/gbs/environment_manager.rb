@@ -4,8 +4,11 @@ module GBS
             @local = LocalEnvironment.new
             @remotes = {}
 
-            @remotes['desktop']   = RemoteEnvironment.new(@local, 'homedesktop')
             @remotes['novaember'] = RemoteEnvironment.new(@local, 'nv')
+
+            Scheduler.register_special('* * * * *') do
+                EnvironmentManager.update_loadavgs
+            end
         end
 
         def self.local
@@ -24,8 +27,12 @@ module GBS
             @remotes[name]
         end
 
+        def self.update_loadavgs
+            all.each(&:update_loadavg)
+        end
+
         def self.best_available
-            all.min_by { |n| n.load[1] } # 5 minute load average
+            all.min_by { |n| n.loadavg[1] } # 5 minute load average
         end
     end
 end

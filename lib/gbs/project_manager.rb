@@ -12,5 +12,9 @@ module GBS
         def self.[](name)
             @projects.find { |n| n.name == name }
         end
+
+        def self.finish
+            @projects.each(&:write_data)
+        end
     end
 end
