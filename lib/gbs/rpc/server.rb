@@ -59,6 +59,11 @@ module GBS
                 end
             end
 
+            def cmd_run_task(project, task)
+                ProjectManager[project].run(EnvironmentManager.best_available, task.to_sym)
+                { status: 'ok?' }
+            end
+
             def cmd_exit
                 Thread.main.wakeup
             end

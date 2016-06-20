@@ -54,6 +54,8 @@ module GBS
 
             @data[:history] << result.status
             @data[:history].unshift if @data[:history].count > 5
+
+            result
         end
 
         # Get the path to where project data will be stored

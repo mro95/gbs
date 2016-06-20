@@ -23,7 +23,7 @@ module GBS
         class Build
             def initialize(project, env)
                 @start = Time.now
-                @file = File.open("#{Userdata.data_path}/logs/builds/#{@start.strftime('%Y-%m-%d-%H-%M')}" +
+                @file = File.open("#{Userdata.data_path}/logs/builds/#{@start.strftime('%Y-%m-%d-%H-%M-%S')}" +
                                   "-#{env.name}-#{project.name}.log", 'w')
 
                 @file.puts "Build started on: #{Time.now}"

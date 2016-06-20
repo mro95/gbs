@@ -30,7 +30,7 @@ end
 
 
 module GBS
-    if ARG_OPTS[:start] then
+    if ARG_OPTS[:start]
         Process.daemon(true, true)
 
         require 'gbs/environment'
@@ -64,11 +64,15 @@ module GBS
 
     @gbs = RPC::Client.new
 
-    if ARG_OPTS[:stop] then
+    if ARG_OPTS[:stop]
         @gbs.exit
         Process.exit
     end
 
+    if ARG_PARAMS[0] == 'run'
+        p @gbs.run_task(ARG_PARAMS[1], ARG_PARAMS[2])
+        Process.exit
+    end
 
     environments = @gbs.get_environments.map do |env|
         loadavg = "%4.2f" % env[:loadavg][1]
