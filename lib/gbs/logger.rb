@@ -9,7 +9,7 @@ module GBS
         end
 
         def self.new_build(project, env)
-            build = Build.new(project, env)
+            build = BuildLogger.new(project, env)
         end
 
         def self.puts(*args)
@@ -20,20 +20,36 @@ module GBS
             @main.close
         end
 
-        class Build
+        class BuildLogger
             def initialize(project, env)
+                @subscribers = []
+                @artifacts = []
+                @project = project
+                @env = env
+
                 @start = Time.now
                 @file = File.open("#{Userdata.data_path}/logs/builds/#{@start.strftime('%Y-%m-%d-%H-%M-%S')}" +
                                   "-#{env.name}-#{project.name}.log", 'w')
 
-                @file.puts "Build started on: #{Time.now}"
+                @file.puts "Build started on: #{@start}"
 
                 @file.write "Build result: "
                 @resultpos = @file.pos
-                @file.puts "       " # leave some space to write 'success' or 'failure'
+                @file.puts "       " # leave some space to write 'success', 'failure' or 'ucancel'
 
-                @file.puts "Project: #{project.name}"
-                @file.puts "Environment: #{env.name}"
+                @file.puts "Project: #{@project.name}"
+                @file.puts "Environment: #{@env.name}"
+            end
+
+            def subscribe(socket)
+                socket.puts({
+                    msg: 'meta',
+                    start: @start,
+                    project: @project.name,
+                    env: @env.name
+                }.to_json)
+
+                @subscribers << socket
             end
 
             def log_command(started, duration, args, out, err, exitstatus)
@@ -44,12 +60,33 @@ module GBS
                             .sort_by { |n| n[5..16] }
 
                 @file.puts "ret [%12.6f] exit %i" % [ duration, exitstatus ]
+
+                @subscribers.each { |n| n.puts({
+                    msg: 'cmd',
+                    started: started,
+                    duration: duration,
+                    args: args,
+                    out: out,
+                    err: err,
+                    exitstatus: exitstatus
+                }.to_json) }
             end
 
-            def finish(status)
+            def register_artifact(name, size)
+                @artifacts << { name: name, size: size }
+            end
+
+            def finish(result)
                 @file.seek(@resultpos)
-                @file.write(status.to_s[0..7])
+                @file.write(result.to_s[0..7])
                 @file.close
+
+                @subscribers.each { |n| n.puts({
+                    msg: 'done',
+                    result: result,
+                    duration: Time.now - @start,
+                    artifacts: @artifacts
+                }.to_json) }
             end
         end
     end

@@ -41,11 +41,11 @@ module GBS
         end
 
         # Run a task
-        def run(env, task_name)
+        def run(env, task_name, subscriber = nil)
             prepare_workspace(env) unless env.prepared_project?(@name)
             env.cd(workspace_directory)
 
-            result = @tasks[task_name].run(env)
+            result = @tasks[task_name].run(env, subscriber)
 
             @data[:last_build] = Time.now
 
@@ -118,8 +118,8 @@ module GBS
             @block = block
         end
 
-        def run(env)
-            TaskRunner.new(@project, env, @block)
+        def run(env, subscriber)
+            TaskRunner.new(@project, env, @block, subscriber)
         end
     end
 
@@ -128,11 +128,13 @@ module GBS
     class TaskRunner
         attr_reader :status
 
-        def initialize(project, env, block)
+        def initialize(project, env, block, subscriber = nil)
             @project = project
             @env = env
-            @build = Logger.new_build(project, env)
+            @logger = Logger.new_build(project, env)
             @status = nil
+
+            @logger.subscribe(subscriber) unless subscriber.nil?
 
             begin
                 instance_eval(&block)
@@ -141,7 +143,7 @@ module GBS
                 @status = :failure
             end
 
-            @build.finish(@status)
+            @logger.finish(@status)
         end
 
         def `(string)
@@ -152,14 +154,16 @@ module GBS
             started = Time.now
             @env.exec(args) do |out, err, exitstatus|
                 duration = Time.now - started
-                @build.log_command(started, duration, args, out, err, exitstatus)
+                @logger.log_command(started, duration, args, out, err, exitstatus)
                 raise TaskFailed if exitstatus != 0
             end
         end
 
         def artifact(filename, artifact_filename = "#{filename}-#{`git describe --tags`.chomp}")
+            destination = "#{@project.artifact_directory}/#{artifact_filename}"
             FileUtils.mkdir_p(@project.artifact_directory)
-            @env.retrieve(filename, "#{@project.artifact_directory}/#{artifact_filename}")
+            @env.retrieve(filename, destination)
+            @logger.register_artifact(artifact_filename, File.size(destination))
         end
     end
 

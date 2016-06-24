@@ -10,9 +10,11 @@ module GBS
                 Thread.start do
                     loop do
                         Thread.start(@server.accept) do |client|
+                            Thread.abort_on_exception = false
+
                             client.each_line do |msg|
                                 data = JSON.parse(msg.chomp, symbolize_names: true)
-                                client.puts(send(:"cmd_#{data[:cmd]}", *data[:args]).to_json)
+                                send(:"cmd_#{data[:cmd]}", client, *data[:args])
                             end
 
                             client.close
@@ -25,8 +27,8 @@ module GBS
                 @server.close
             end
 
-            def cmd_get_projects
-                ProjectManager.projects.map do |project|
+            def cmd_get_projects(client)
+                projects = ProjectManager.projects.map do |project|
                     {
                         name: project.name,
                         schedules: project.schedules,
@@ -36,46 +38,58 @@ module GBS
                         history: project.data[:history]
                     }
                 end
+
+                client.puts(projects.to_json)
             end
 
-            def cmd_get_environments
-                EnvironmentManager.all.map do |env|
+            def cmd_get_environments(client)
+                envs = EnvironmentManager.all.map do |env|
                     {
                         name: env.name,
                         loadavg: env.loadavg,
                         load_max: env.load_max
                     }
                 end
+
+                client.puts(envs.to_json)
             end
 
-            def cmd_get_recent_builds
+            def cmd_get_recent_builds(client)
                 FileUtils.cd(Userdata.data_path('/logs/builds')) do
-                    return Dir['*'].sort_by { |n| -File.mtime(n).to_i }.first(5).map do |filename|
+                    builds = Dir['*'].sort_by { |n| -File.mtime(n).to_i }.first(5).map do |filename|
                         File.open(filename, 'r') do |file|
                             fields = file.each_line.first(4).map { |n| n.split(': ', 2).last.chomp }
                             [ :start, :result, :project, :env ].zip(fields).to_h
                         end
                     end
+
+                    client.puts(builds.to_json)
                 end
             end
 
-            def cmd_run_task(project, task)
-                ProjectManager[project].run(EnvironmentManager.best_available, task.to_sym)
-                { status: 'ok?' }
+            def cmd_run_task(client, project, task)
+                client.puts({ build: 'starting' }.to_json)
+
+                ProjectManager[project].run(EnvironmentManager.best_available, task.to_sym, client)
+
+                client.puts({ build: 'done' }.to_json)
             end
 
-            def cmd_exit
+            def cmd_exit(client)
+                client.close
                 Thread.main.wakeup
             end
         end
 
         class Client
+            attr_reader :socket
+
             def initialize(ip = '127.0.0.1', port = '2552')
                 @socket = TCPSocket.new(ip, port)
 
                 Server.instance_methods(false).grep(/^cmd_/).each do |method|
                     cmd = method[4..-1]
-                    params = Server.instance_method(method).parameters
+                    params = Server.instance_method(method).parameters.drop(1)
 
                     self.class.send(:define_method, cmd) do |*args|
                         # TODO: Validate arguments

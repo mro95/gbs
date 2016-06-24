@@ -43,8 +43,9 @@ module GBS
             end
 
             padding = options[:padding] || 2
+            indent = options[:indent] || 0
 
-            table.map { |row| row.each_with_index.map { |cell, i| cell.ljust_term(colsizes[i]) }.join(' ' * padding) }
+            table.map { |row| row.each_with_index.map { |cell, i| cell.ljust_term(colsizes[i]) }.join(' ' * padding).indent(indent) }
         end
 
         def self.time_ago(time)
