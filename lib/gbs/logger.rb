@@ -16,7 +16,7 @@ module GBS
             @main.puts(*args)
         end
 
-        def self.finish
+        def self.shutdown
             @main.close
         end
 

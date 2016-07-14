@@ -13,7 +13,7 @@ module GBS
             @projects.find { |n| n.name == name }
         end
 
-        def self.finish
+        def self.shutdown
             @projects.each(&:write_data)
         end
     end

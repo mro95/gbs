@@ -16,9 +16,7 @@ module GBS
         def self.send_help(options)
             puts "Usage: #{$0} [option...] project [task...]"
             puts
-            options.each do |opt|
-                puts '  %-2s  %-12s  %s' % [ opt[:short], opt[:long], opt[:desc] ]
-            end
+            puts tabularize(options.map { |opt| [ opt[:short], opt[:long], opt[:desc] ] }, indent: 2)
         end
 
         def self.parse_arguments(options, argv)

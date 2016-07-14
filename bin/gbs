@@ -53,8 +53,8 @@ module GBS
 
         sleep
 
-        Logger.finish
-        ProjectManager.finish
+        Logger.shutdown
+        ProjectManager.shutdown
         @server.stop
 
         Process.exit
