@@ -152,11 +152,16 @@ module GBS
 
         def shell(args)
             started = Time.now
-            @env.exec(args) do |out, err, exitstatus|
-                duration = Time.now - started
-                @logger.log_command(started, duration, args, out, err, exitstatus)
-                raise TaskFailed if exitstatus != 0
+            @logger.start_command(started, args)
+
+            out, exitstatus = @env.exec(args) do |time, line|
+                @logger.progress_command(time, line)
             end
+
+            duration = Time.now - started
+            @logger.finish_command(duration, exitstatus)
+
+            raise TaskFailed if exitstatus != 0
         end
 
         def artifact(filename, artifact_filename = "#{filename}-#{`git describe --tags`.chomp}")

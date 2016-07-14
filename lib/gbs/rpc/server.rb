@@ -10,7 +10,7 @@ module GBS
                 Thread.start do
                     loop do
                         Thread.start(@server.accept) do |client|
-                            Thread.abort_on_exception = false
+                            Thread.abort_on_exception = true
 
                             client.each_line do |msg|
                                 data = JSON.parse(msg.chomp, symbolize_names: true)

@@ -52,22 +52,31 @@ module GBS
                 @subscribers << socket
             end
 
-            def log_command(started, duration, args, out, err, exitstatus)
-                @file.puts "cmd [%12.6f] %s" % [ started - @start, args.shelljoin ]
+            def start_command(timestamp, args)
+                @file.puts "cmd [%12.6f] %s" % [ timestamp - @start, args.shelljoin ]
 
-                @file.puts (out.map { |time, line| "out [%12.6f] %s" % [ time, line ] } +
-                            err.map { |time, line| "err [%12.6f] %s" % [ time, line ] })
-                            .sort_by { |n| n[5..16] }
+                @subscribers.each { |n| n.puts({
+                    msg: 'start_command',
+                    started: timestamp,
+                    args: args,
+                }.to_json) }
+            end
 
+            def progress_command(time, line)
+                @file.puts "out [%12.6f] %s" % [ time, line ]
+
+                @subscribers.each { |n| n.puts({
+                    msg: 'progress_command',
+                    output: [ [ time, line ] ],
+                }.to_json) }
+            end
+
+            def finish_command(duration, exitstatus)
                 @file.puts "ret [%12.6f] exit %i" % [ duration, exitstatus ]
 
                 @subscribers.each { |n| n.puts({
-                    msg: 'cmd',
-                    started: started,
+                    msg: 'finish_command',
                     duration: duration,
-                    args: args,
-                    out: out,
-                    err: err,
                     exitstatus: exitstatus
                 }.to_json) }
             end

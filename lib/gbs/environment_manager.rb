@@ -4,7 +4,7 @@ module GBS
             @local = LocalEnvironment.new
             @remotes = {}
 
-            @remotes['novaember'] = RemoteEnvironment.new(@local, 'nv')
+            # @remotes['novaember'] = RemoteEnvironment.new(@local, 'nv')
 
             Scheduler.register_special('* * * * *') do
                 EnvironmentManager.update_loadavgs

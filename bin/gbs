@@ -69,10 +69,10 @@ module GBS
         Process.exit
     end
 
-    if ARG_PARAMS[0] == 'run'
+    if ARG_PARAMS[0] == 'build'
         require 'shellwords'
 
-        @gbs.run_task(ARG_PARAMS[1], ARG_PARAMS[2])
+        @gbs.run_task(ARG_PARAMS[1], :build)
         @gbs.socket.each_line do |json|
             json = JSON.parse(json, symbolize_names: true)
 
@@ -81,16 +81,17 @@ module GBS
                 puts "Starting build for #{json[:project].blue.bold} on #{json[:env].blue.bold}"
                 puts "Press ^Z to continue in the background."
                 puts
-            when 'cmd'
+            when 'start_command'
                 cmd = json[:args].shelljoin
-                exitstatus = json[:exitstatus].to_s.green.bold
-                duration = "in #{json[:duration].round(2)}s".cyan
-                out = json[:out].map { |n| [ n.first, 'out: '.green + n.last ] }
-                err = json[:err].map { |n| [ n.first, 'err: '.red   + n.last ] }
-                output = (out + err).sort_by(&:first).map(&:last)
-
-                puts "> #{cmd}".yellow
+                puts "$ #{cmd}".yellow
+            when 'progress_command'
+                output = json[:output].map { |n| "#{"[%9.3f]".black.bold} %s" % n }
                 puts output
+            when 'finish_command'
+                exitcolor = json[:exitstatus] == 0 ? :green : :red
+                exitstatus = json[:exitstatus].to_s.bold.send(exitcolor)
+                duration = "in #{json[:duration].round(2)}s".cyan
+
                 puts "#{"exit:".yellow} #{exitstatus} #{duration}"
                 puts
             when 'done'

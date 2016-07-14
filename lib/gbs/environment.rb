@@ -1,4 +1,4 @@
-require 'open3'
+require 'pty'
 require 'shellwords'
 
 module GBS
@@ -25,13 +25,12 @@ module GBS
         end
 
         def exec_return(args)
-            exec(args) do |out, err, exitstatus|
-                return ((out + err).sort_by(&:first)).map(&:last).join("\n")
-            end
+            out, exitstatus = exec(args)
+            out.map(&:last).join("\n")
         end
 
         def shell_return(string)
-            exec_return %W( bash -c #{string.shellescape} )
+            exec_return %W( bash -c #{string} )
         end
     end
 
@@ -51,44 +50,37 @@ module GBS
         end
 
         def exec(argv)
-            FileUtils.cd(@cwd) do
-                Open3.popen3(*argv) do |stdin, stdout, stderr, thread|
-                    start = Time.now
-                    Logger.puts "pid #{thread.pid} cwd #{@cwd}: #{argv.shelljoin}"
-                    stdin.close
-                    stdout.sync = true
-                    stderr.sync = true
+            outbuf = []
 
-                    outbuf = []
-                    errbuf = []
+            Dir.chdir(@cwd) do
+                begin
+                    PTY.spawn(*argv) do |stdout, stdin, pid|
+                        start = Time.now
+                        Logger.puts "pid #{pid} cwd #{@cwd}: #{argv.shelljoin}"
+                        stdin.close
+                        stdout.sync = true
 
-                    begin
-                        until stdout.closed?
-                            avail = IO.select([ stdout, stderr ])
-                            time = Time.now - start
-                            avail.first.each do |io|
-                                io.readpartial(4096).each_line do |line|
-                                    buf = (io == stdout) ? outbuf : errbuf
-                                    desc = (io == stdout) ? 'out' : 'err'
-
-                                    buf << [ time, line ]
-                                    Logger.puts "[%12.6f] %s: %s" % [ time, desc, line ]
-                                end
+                        begin
+                            stdout.each_line do |line|
+                                time = Time.now - start
+                                outbuf << [ time, line ]
+                                yield(time, line) if block_given?
                             end
+                        rescue Errno::EIO => e
+                            # Hopefully this only happens when stdout is closed?
                         end
-                    rescue EOFError => e
+
+                        Process.wait(pid)
+                        return outbuf, $?.exitstatus
                     end
-
-                    Logger.puts thread.value
-
-                    return yield(outbuf, errbuf, thread.value.exitstatus) if block_given?
-                    return thread.value.exitstatus
+                rescue PTY::ChildExited => e
+                    return outbuf, e.status
                 end
             end
         end
 
-        def retrieve(remote, lcoal)
-            FileUtils.cp(remote, local)
+        def retrieve(remote, local)
+            FileUtils.cp(File.join(@cwd, remote), local)
         end
     end
 
@@ -115,7 +107,7 @@ module GBS
 
         # This approach has about 20ms overhead per command
         def exec(argv, &block)
-            sshcmd = %W( ssh #{@remote} -S #{controlsocket} cd #{@cwd} && )
+            sshcmd = %W( ssh #{@remote} -tS #{controlsocket} cd #{@cwd} && )
             @local.exec(sshcmd + argv, &block)
         end
 
