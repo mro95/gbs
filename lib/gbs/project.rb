@@ -154,8 +154,8 @@ module GBS
             started = Time.now
             @logger.start_command(started, args)
 
-            out, exitstatus = @env.exec(args) do |time, line|
-                @logger.progress_command(time, line)
+            out, exitstatus = @env.exec(args) do |desc, time, line|
+                @logger.progress_command(desc, time, line)
             end
 
             duration = Time.now - started

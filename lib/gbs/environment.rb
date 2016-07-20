@@ -52,31 +52,36 @@ module GBS
         def exec(argv)
             outbuf = []
 
-            Dir.chdir(@cwd) do
-                begin
-                    PTY.spawn(*argv) do |stdout, stdin, pid|
-                        start = Time.now
-                        Logger.puts "pid #{pid} cwd #{@cwd}: #{argv.shelljoin}"
-                        stdin.close
-                        stdout.sync = true
+            stdout, stdout_slave = PTY.open
+            stderr, stderr_slave = PTY.open
+            pid = spawn(*argv, out: stdout_slave, err: stderr_slave, chdir: @cwd)
 
-                        begin
-                            stdout.each_line do |line|
-                                time = Time.now - start
-                                outbuf << [ time, line ]
-                                yield(time, line) if block_given?
-                            end
-                        rescue Errno::EIO => e
-                            # Hopefully this only happens when stdout is closed?
+            stdout_slave.close
+            stderr_slave.close
+
+            start = Time.now
+            Logger.puts "pid #{pid} cwd #{@cwd}: #{argv.shelljoin}"
+
+            begin
+                until stdout.closed? && stderr.closed?
+                    avail = IO.select([ stdout, stderr ])
+                    time = Time.now - start
+                    avail.first.each do |io|
+                        io.readpartial(4096).each_line do |line| # TODO: May not read a full line
+                            desc = (io == stdout) ? :out : :err
+
+                            outbuf << [ time, desc, line ]
+                            yield(desc, time, line) if block_given?
+                            Logger.puts "[%12.6f] %s: %s" % [ time, desc, line ]
                         end
-
-                        Process.wait(pid)
-                        return outbuf, $?.exitstatus
                     end
-                rescue PTY::ChildExited => e
-                    return outbuf, e.status
                 end
+            rescue Errno::EIO
+                # Hopefully this only happens when stdout is closed?
             end
+
+            Process.wait(pid)
+            return outbuf, $?.exitstatus # TODO: Possibly thread-unsafe
         end
 
         def retrieve(remote, local)

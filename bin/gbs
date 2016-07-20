@@ -85,7 +85,9 @@ module GBS
                 cmd = json[:args].shelljoin
                 puts "$ #{cmd}".yellow
             when 'progress_command'
-                output = json[:output].map { |n| "#{"[%9.3f]".black.bold} %s" % n }
+                output = json[:output].map do |n|
+                    "#{"%s".send(n.first == 'out' ? :green : :red)} #{"[%9.3f]".black.bold} %s" % n
+                end
                 puts output
             when 'finish_command'
                 exitcolor = json[:exitstatus] == 0 ? :green : :red

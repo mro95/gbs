@@ -62,12 +62,12 @@ module GBS
                 }.to_json) }
             end
 
-            def progress_command(time, line)
-                @file.puts "out [%12.6f] %s" % [ time, line ]
+            def progress_command(desc, time, line)
+                @file.puts "%s [%12.6f] %s" % [ desc, time, line ]
 
                 @subscribers.each { |n| n.puts({
                     msg: 'progress_command',
-                    output: [ [ time, line ] ],
+                    output: [ [ desc, time, line ] ],
                 }.to_json) }
             end
 
