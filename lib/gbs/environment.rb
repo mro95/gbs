@@ -35,26 +35,24 @@ module GBS
     end
 
     class LocalEnvironment < Environment
-        def initialize
-            @cwd = Dir.pwd
-
-            super()
-        end
-
         def name
             :local
         end
 
-        def cd(dir)
-            @cwd = dir
-        end
-
-        def exec(argv)
+        def exec(argv, options = {})
             outbuf = []
 
             stdout, stdout_slave = PTY.open
             stderr, stderr_slave = PTY.open
-            pid = spawn(*argv, out: stdout_slave, err: stderr_slave, chdir: @cwd)
+
+            spawn_opts = {
+                out: stdout_slave,
+                err: stderr_slave
+            }
+
+            spawn_opts[:chdir] = options[:chdir] if options.has_key?(:chdir)
+
+            pid = spawn(*argv, spawn_opts)
 
             stdout_slave.close
             stderr_slave.close
@@ -81,11 +79,16 @@ module GBS
             end
 
             Process.wait(pid)
-            return outbuf, $?.exitstatus # TODO: Possibly thread-unsafe
+
+            # status will simply be the exit status if process exited correctly, if not it'll contain some extra
+            # information that can be used for debugging.
+            status = ($?.to_i >> 8 | $?.to_i << 8) & 0xffff
+
+            return outbuf, status # TODO: Possibly thread-unsafe
         end
 
         def retrieve(remote, local)
-            FileUtils.cp(File.join(@cwd, remote), local)
+            FileUtils.cp(remote, local)
         end
     end
 
@@ -102,22 +105,21 @@ module GBS
             @remote
         end
 
-        def cd(dir)
-            @cwd = dir
-        end
-
         def controlsocket
             Userdata.data_path("/controlsockets/#{@remote}")
         end
 
         # This approach has about 20ms overhead per command
-        def exec(argv, &block)
-            sshcmd = %W( ssh #{@remote} -tS #{controlsocket} cd #{@cwd} && )
+        def exec(argv, options = {}, &block)
+            sshcmd = %W( ssh #{@remote} -tS #{controlsocket} )
+
+            sshcmd += %W( cd #{options[:chdir]} && ) if options.has_key?(:chdir)
+
             @local.exec(sshcmd + argv, &block)
         end
 
         def retrieve(remote, local)
-            @local.exec %W( scp #{@remote}:#{@cwd}/#{remote} #{local} )
+            @local.exec %W( scp #{@remote}:#{remote} #{local} )
         end
     end
 end

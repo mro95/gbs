@@ -8,8 +8,8 @@ module GBS
             @main = File.open("#{Userdata.data_path}/logs/#{Time.now.strftime('%Y-%m-%d-%H-%M')}-gbs.log", 'w')
         end
 
-        def self.new_build(project, env)
-            build = BuildLogger.new(project, env)
+        def self.new_build(start, project, env)
+            build = BuildLogger.new(start, project, env)
         end
 
         def self.puts(*args)
@@ -21,64 +21,57 @@ module GBS
         end
 
         class BuildLogger
-            def initialize(project, env)
+            def initialize(start, project, env)
                 @subscribers = []
                 @artifacts = []
+                @start = start
                 @project = project
                 @env = env
 
-                @start = Time.now
                 @file = File.open("#{Userdata.data_path}/logs/builds/#{@start.strftime('%Y-%m-%d-%H-%M-%S')}" +
                                   "-#{env.name}-#{project.name}.log", 'w')
 
-                @file.puts "Build started on: #{@start}"
+                @buffer = ""
+
+                log "Build started on: #{@start}"
 
                 @file.write "Build result: "
                 @resultpos = @file.pos
                 @file.puts "       " # leave some space to write 'success', 'failure' or 'ucancel'
 
-                @file.puts "Project: #{@project.name}"
-                @file.puts "Environment: #{@env.name}"
+                log "Project: #{@project.name}"
+                log "Environment: #{@env.name}"
+            end
+
+            def log(msg)
+                @file.puts msg
+
+                @subscribers.each do |sub|
+                    begin
+                        sub.puts(msg)
+                    rescue IOError
+                        @subscribers.delete(sub)
+                    end
+                end
+
+                @buffer << "#{msg}\n"
             end
 
             def subscribe(socket)
-                socket.puts({
-                    msg: 'meta',
-                    start: @start,
-                    project: @project.name,
-                    env: @env.name
-                }.to_json)
-
+                socket.write @buffer
                 @subscribers << socket
             end
 
             def start_command(timestamp, args)
-                @file.puts "cmd [%12.6f] %s" % [ timestamp - @start, args.shelljoin ]
-
-                @subscribers.each { |n| n.puts({
-                    msg: 'start_command',
-                    started: timestamp,
-                    args: args,
-                }.to_json) }
+                log "cmd [%12.6f] %s" % [ timestamp - @start, args.shelljoin ]
             end
 
             def progress_command(desc, time, line)
-                @file.puts "%s [%12.6f] %s" % [ desc, time, line ]
-
-                @subscribers.each { |n| n.puts({
-                    msg: 'progress_command',
-                    output: [ [ desc, time, line ] ],
-                }.to_json) }
+                log "%s [%12.6f] %s" % [ desc, time, line ]
             end
 
             def finish_command(duration, exitstatus)
-                @file.puts "ret [%12.6f] exit %i" % [ duration, exitstatus ]
-
-                @subscribers.each { |n| n.puts({
-                    msg: 'finish_command',
-                    duration: duration,
-                    exitstatus: exitstatus
-                }.to_json) }
+                log "ret [%12.6f] exit %i" % [ duration, exitstatus ]
             end
 
             def register_artifact(name, size)
@@ -90,12 +83,7 @@ module GBS
                 @file.write(result.to_s[0..7])
                 @file.close
 
-                @subscribers.each { |n| n.puts({
-                    msg: 'done',
-                    result: result,
-                    duration: Time.now - @start,
-                    artifacts: @artifacts
-                }.to_json) }
+                @subscribers.each { |n| n.puts("Build result: #{result}") }
             end
         end
     end

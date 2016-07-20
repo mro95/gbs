@@ -73,42 +73,49 @@ module GBS
         require 'shellwords'
 
         @gbs.run_task(ARG_PARAMS[1], :build)
-        @gbs.socket.each_line do |json|
-            json = JSON.parse(json, symbolize_names: true)
 
-            case json[:msg]
-            when 'meta'
-                puts "Starting build for #{json[:project].blue.bold} on #{json[:env].blue.bold}"
-                puts "Press ^Z to continue in the background."
-                puts
-            when 'start_command'
-                cmd = json[:args].shelljoin
-                puts "$ #{cmd}".yellow
-            when 'progress_command'
-                output = json[:output].map do |n|
-                    "#{"%s".send(n.first == 'out' ? :green : :red)} #{"[%9.3f]".black.bold} %s" % n
-                end
-                puts output
-            when 'finish_command'
-                exitcolor = json[:exitstatus] == 0 ? :green : :red
-                exitstatus = json[:exitstatus].to_s.bold.send(exitcolor)
-                duration = "in #{json[:duration].round(2)}s".cyan
+        Signal.trap("SIGTSTP") do
+            puts " Continuing build in the background..."
+            Process.exit
+        end
 
-                puts "#{"exit:".yellow} #{exitstatus} #{duration}"
-                puts
-            when 'done'
-                resultcolor = json[:result] == 'success' ? :green : :red
-                duration = "in #{json[:duration].round(2)}s"
+        @gbs.socket.each_line do |line|
+            # json = JSON.parse(json, symbolize_names: true)
 
-                puts "Build result: #{json[:result].send(resultcolor).bold} #{duration.cyan}"
-                puts "Generated artifacts:"
-                puts Utils.tabularize(json[:artifacts].map { |n| [
-                    n[:name].blue.bold,
-                    "#{n[:size] / 1024 / 1024}M".yellow
-                ] }, indent: 4)
-            end
+            # case json[:msg]
+            # when 'meta'
+            #     puts "Starting build for #{json[:project].blue.bold} on #{json[:env].blue.bold}"
+            #     puts "Press ^Z to continue in the background."
+            #     puts
+            # when 'start_command'
+            #     cmd = json[:args].shelljoin
+            #     puts "$ #{cmd}".yellow
+            # when 'progress_command'
+            #     output = json[:output].map do |n|
+            #         "#{"%s".send(n.first == 'out' ? :green : :red)} #{"[%9.3f]".black.bold} %s" % n
+            #     end
+            #     puts output
+            # when 'finish_command'
+            #     exitcolor = json[:exitstatus] == 0 ? :green : :red
+            #     exitstatus = json[:exitstatus].to_s.bold.send(exitcolor)
+            #     duration = "in #{json[:duration].round(2)}s".cyan
 
-            break if json.fetch(:msg) == 'done'
+            #     puts "#{"exit:".yellow} #{exitstatus} #{duration}"
+            #     puts
+            # when 'done'
+            #     resultcolor = json[:result] == 'success' ? :green : :red
+            #     duration = "in #{json[:duration].round(2)}s"
+
+            #     puts "Build result: #{json[:result].send(resultcolor).bold} #{duration.cyan}"
+            #     puts "Generated artifacts:"
+            #     puts Utils.tabularize(json[:artifacts].map { |n| [
+            #         n[:name].blue.bold,
+            #         "#{n[:size] / 1024 / 1024}M".yellow
+            #     ] }, indent: 4)
+            # end
+
+            puts line
+            break if line =~ /^Build result: /
         end
 
         Process.exit
@@ -148,25 +155,41 @@ module GBS
         [ name, history.join(' '), last_build ]
     end
 
-    builds = @gbs.get_recent_builds.map do |build|
-        build[:start] = Time.parse(build[:start])
-        result_color = build[:result] == 'success' ? :green
-                     : build[:result] == 'failure' ? :red : :yellow
+    running_tasks = @gbs.running_tasks.map do |task|
+        task[:start] = Time.parse(task[:start])
 
         [
-            build[:project].blue.bold,
-            build[:result].send(result_color).bold,
-            Utils.time_ago(build[:start]).yellow,
-            build[:env].cyan
+            task[:project].blue.bold,
+            task[:task].blue,
+            Utils.time_ago(task[:start]).yellow,
+            task[:env].cyan
         ]
     end
+    running_tasks[0] ||= [ 'no tasks running'.black.bold ]
 
+    # builds = @gbs.get_recent_builds.map do |build|
+    #     build[:start] = Time.parse(build[:start])
+    #     result_color = build[:result] == 'success' ? :green
+    #                  : build[:result] == 'failure' ? :red : :yellow
+
+    #     [
+    #         build[:project].blue.bold,
+    #         build[:result].send(result_color).bold,
+    #         Utils.time_ago(build[:start]).yellow,
+    #         build[:env].cyan
+    #     ]
+    # end
+
+    puts
     puts "Environments"
     puts Utils.tabularize(environments, minsizes: [ 16, 4 ]).join("\n").indent(4)
     puts
     puts "Projects"
     puts Utils.tabularize(projects, minsizes: [ 16, 9 ]).join("\n").indent(4)
     puts
-    puts "Recent builds"
-    puts Utils.tabularize(builds, minsizes: [ 16 ]).join("\n").indent(4)
+    puts "Running tasks"
+    puts Utils.tabularize(running_tasks, minsizes: [ 16 ]).join("\n").indent(4)
+    puts
+    # puts "Recent builds"
+    # puts Utils.tabularize(builds, minsizes: [ 16 ]).join("\n").indent(4)
 end

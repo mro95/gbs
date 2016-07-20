@@ -37,7 +37,7 @@ module GBS
             end
 
             def run
-                @project.run(EnvironmentManager.best_available, @task)
+                running_task = ProjectManager.run(EnvironmentManager.best_available, @project.name, @task)
             end
 
             def inspect

@@ -53,24 +53,25 @@ module GBS
             end
 
             def cmd_get_recent_builds(client)
-                FileUtils.cd(Userdata.data_path('/logs/builds')) do
-                    builds = Dir['*'].sort_by { |n| -File.mtime(n).to_i }.first(5).map do |filename|
-                        File.open(filename, 'r') do |file|
-                            fields = file.each_line.first(4).map { |n| n.split(': ', 2).last.chomp }
-                            [ :start, :result, :project, :env ].zip(fields).to_h
-                        end
+                builds = Dir[Userdata.data_path('/logs/builds/*')].sort_by { |n| -File.mtime(n).to_i }.first(5).map do |filename|
+                    File.open(filename, 'r') do |file|
+                        fields = file.each_line.first(4).map { |n| n.split(': ', 2).last.chomp }
+                        [ :start, :result, :project, :env ].zip(fields).to_h
                     end
-
-                    client.puts(builds.to_json)
                 end
+
+                client.puts(builds.to_json)
             end
 
             def cmd_run_task(client, project, task)
-                client.puts({ build: 'starting' }.to_json)
+                running_task = ProjectManager.run(EnvironmentManager.best_available, project, task)
+                client.puts(running_task.to_json)
 
-                ProjectManager[project].run(EnvironmentManager.best_available, task.to_sym, client)
+                running_task.subscribe(client)
+            end
 
-                client.puts({ build: 'done' }.to_json)
+            def cmd_running_tasks(client)
+                client.puts(ProjectManager.running_tasks.to_json)
             end
 
             def cmd_exit(client)

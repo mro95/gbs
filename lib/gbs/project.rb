@@ -33,29 +33,17 @@ module GBS
 
         def prepare_workspace(env)
             env.exec %W( mkdir -p #{workspace_directory} )
-            env.cd(workspace_directory)
 
-            @repositories.each { |r| r.setup(env) }
+            @repositories.each { |r| r.setup(env, workspace_directory) }
 
             env.prepared_project(@name)
         end
 
         # Run a task
-        def run(env, task_name, subscriber = nil)
+        def run(env, task_name)
             prepare_workspace(env) unless env.prepared_project?(@name)
-            env.cd(workspace_directory)
 
-            result = @tasks[task_name].run(env, subscriber)
-
-            @data[:last_build] = Time.now
-
-            @data[:last_success] = Time.now if result.status == :success
-            @data[:last_failure] = Time.now if result.status == :failure
-
-            @data[:history] << result.status
-            @data[:history].unshift if @data[:history].count > 5
-
-            result
+            @tasks[task_name].run(env)
         end
 
         # Get the path to where project data will be stored
@@ -99,7 +87,7 @@ module GBS
         end
 
         def task(name, &block)
-            @project.tasks[name] = Task.new(@project, block)
+            @project.tasks[name] = Task.new(name, @project, block)
         end
 
         def schedule(specifier, task)
@@ -113,13 +101,14 @@ module GBS
     class Task
         attr_reader :actions
 
-        def initialize(project, block)
+        def initialize(name, project, block)
+            @name = name
             @project = project
             @block = block
         end
 
-        def run(env, subscriber)
-            TaskRunner.new(@project, env, @block, subscriber)
+        def run(env)
+            TaskRunner.new(@name, @project, env, @block)
         end
     end
 
@@ -128,22 +117,39 @@ module GBS
     class TaskRunner
         attr_reader :status
 
-        def initialize(project, env, block, subscriber = nil)
+        def initialize(name, project, env, block)
+            @name = name
             @project = project
             @env = env
-            @logger = Logger.new_build(project, env)
+            @start = Time.now
+            @logger = Logger.new_build(@start, project, env)
             @status = nil
 
-            @logger.subscribe(subscriber) unless subscriber.nil?
+            Thread.new do
+                begin
+                    instance_eval(&block)
+                    @status = :success
+                rescue TaskFailed
+                    @status = :failure
+                end
 
-            begin
-                instance_eval(&block)
-                @status = :success
-            rescue TaskFailed
-                @status = :failure
+                @logger.finish(@status)
+                ProjectManager.running_tasks.delete(self)
+
+                @project.data[:last_build] = Time.now
+
+                @project.data[:last_success] = Time.now if @status == :success
+                @project.data[:last_failure] = Time.now if @status == :failure
+
+                @project.data[:history] << @status
+                @project.data[:history].unshift if @project.data[:history].count > 5
             end
 
-            @logger.finish(@status)
+            @logger
+        end
+
+        def subscribe(sub)
+            @logger.subscribe(sub)
         end
 
         def `(string)
@@ -151,14 +157,14 @@ module GBS
         end
 
         def shell(args)
-            started = Time.now
-            @logger.start_command(started, args)
+            start = Time.now
+            @logger.start_command(start, args)
 
-            out, exitstatus = @env.exec(args) do |desc, time, line|
+            out, exitstatus = @env.exec(args, chdir: @project.workspace_directory) do |desc, time, line|
                 @logger.progress_command(desc, time, line)
             end
 
-            duration = Time.now - started
+            duration = Time.now - start
             @logger.finish_command(duration, exitstatus)
 
             raise TaskFailed if exitstatus != 0
@@ -167,8 +173,17 @@ module GBS
         def artifact(filename, artifact_filename = "#{filename}-#{`git describe --tags`.chomp}")
             destination = "#{@project.artifact_directory}/#{artifact_filename}"
             FileUtils.mkdir_p(@project.artifact_directory)
-            @env.retrieve(filename, destination)
+            @env.retrieve(File.join(@project.workspace_directory, filename), destination)
             @logger.register_artifact(artifact_filename, File.size(destination))
+        end
+
+        def to_json(options = nil)
+            {
+                project: @project.name,
+                task: @name,
+                start: @start,
+                env: @env.name
+            }.to_json
         end
     end
 
@@ -177,11 +192,11 @@ module GBS
             @remote = remote
         end
 
-        def setup(env)
-            env.exec %W( git init )
-            env.exec %W( git config remote.origin.url #{@remote} )
-            env.exec %W( git fetch --tags origin master )
-            env.exec %W( git pull origin )
+        def setup(env, workspace_directory)
+            env.exec %W( git init ),                                 chdir: workspace_directory
+            env.exec %W( git config remote.origin.url #{@remote} ),  chdir: workspace_directory
+            env.exec %W( git fetch --tags origin master ),           chdir: workspace_directory
+            env.exec %W( git pull origin ),                          chdir: workspace_directory
         end
     end
 end
