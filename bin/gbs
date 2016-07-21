@@ -37,6 +37,7 @@ module GBS
         require 'gbs/environment_manager'
         require 'gbs/logger'
         require 'gbs/project'
+        require 'gbs/task'
         require 'gbs/project_manager'
         require 'gbs/scheduler'
         require 'gbs/userdata'
