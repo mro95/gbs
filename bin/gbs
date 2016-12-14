@@ -70,6 +70,14 @@ module GBS
         Process.exit
     end
 
+    if ARG_PARAMS[0] == 'reload'
+        puts "Reloading..."
+        blaat = @gbs.reload_userdata()
+        puts " done! \n"
+        puts blaat
+        Process.exit
+    end
+
     if ARG_PARAMS[0] == 'build'
         require 'shellwords'
 

@@ -1,6 +1,10 @@
 module GBS
     module Userdata
         def self.projects
+            self.reload
+        end
+
+        def self.reload
             Dir["#{config_path}/projects/*.rb"].map do |filename|
                 filecontents = File.read(filename)
                 ProjectProxy.new(filecontents).project

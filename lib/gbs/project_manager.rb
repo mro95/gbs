@@ -26,6 +26,10 @@ module GBS
             @running_tasks
         end
 
+        def self.reload()
+            @projects = Userdata.reload()
+        end
+
         def self.shutdown
             @projects.each(&:write_data)
         end

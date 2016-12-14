@@ -64,14 +64,28 @@ module GBS
             end
 
             def cmd_run_task(client, project, task)
-                running_task = ProjectManager.run(EnvironmentManager.best_available, project, task)
-                client.puts(running_task.to_json)
+                begin
+                    running_task = ProjectManager.run(EnvironmentManager.best_available, project, task)
+                    client.puts(running_task.to_json)
 
-                running_task.subscribe(client)
+                    running_task.subscribe(client)
+                rescue => e
+                    puts e.message
+                    puts e.backtrace.inspect
+                end
             end
 
             def cmd_running_tasks(client)
                 client.puts(ProjectManager.running_tasks.to_json)
+            end
+
+            def cmd_reload_userdata(client)
+                Userdata.reload()
+                test = {
+                    success: 'true'
+                }
+                ProjectManager.reload()
+                client.puts(test.to_json)
             end
 
             def cmd_exit(client)
