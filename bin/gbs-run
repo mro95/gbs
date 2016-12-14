@@ -36,7 +36,7 @@ module GBS
     end
 
     if ARG_PARAMS.length == 0
-        send_help
+        GBS::Utils.send_help(options)
         exit
     end
 
