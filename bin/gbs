@@ -9,27 +9,26 @@ require 'gbs/rpc/server'
 
 Thread.abort_on_exception = true
 
-options = GBS::Utils.parse_options [
-    %w( -h  --help        Print this help and exit           ),
-    %w( -v  --version     Print version information and exit ),
-    %w( -s  --start       Start the daemon                   ),
-    %w( -x  --stop        Stop the daemon                    ),
-]
-
-ARG_OPTS, ARG_PARAMS = GBS::Utils.parse_arguments(options, ARGV)
-
-if ARG_OPTS[:version]
-    puts "gbs v0.1.0"
-    exit
-end
-
-if ARG_OPTS[:help]
-    GBS::Utils.send_help(options)
-    exit
-end
-
-
 module GBS
+    options = GBS::Utils.parse_options [
+        %w( -h  --help        Print this help and exit           ),
+        %w( -v  --version     Print version information and exit ),
+        %w( -s  --start       Start the daemon                   ),
+        %w( -x  --stop        Stop the daemon                    ),
+    ]
+
+    ARG_OPTS, ARG_PARAMS = GBS::Utils.parse_arguments(options, ARGV)
+
+    if ARG_OPTS[:version]
+        puts "gbs v0.1.0"
+        exit
+    end
+
+    if ARG_OPTS[:help]
+        GBS::Utils.send_help(options)
+        exit
+    end
+
     if ARG_OPTS[:start]
         Process.daemon(true, true)
 
@@ -62,8 +61,18 @@ module GBS
     end
 
     # Client actions
-
-    @gbs = RPC::Client.new
+    
+    begin
+        @gbs = RPC::Client.new
+    rescue Errno::ECONNREFUSED => e
+        port = 2552
+        host = 'localhost'
+        puts "Can not find server on #{host}:#{port}."
+        puts "Server not started? try #{$0} --start"
+        puts ""
+        Utils.send_help(options)
+        Process.exit
+    end
 
     if ARG_OPTS[:stop]
         @gbs.exit
