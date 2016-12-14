@@ -33,7 +33,7 @@ module GBS
                 begin
                     instance_eval(&block)
                     @status = :success
-                rescue TaskFailed
+                rescue
                     @status = :failure
                 end
 

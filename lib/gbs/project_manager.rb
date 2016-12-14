@@ -27,7 +27,7 @@ module GBS
         end
 
         def self.reload()
-            @projects = Userdata.reload()
+            @projects = Userdata.projects
         end
 
         def self.shutdown

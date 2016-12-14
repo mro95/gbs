@@ -80,10 +80,14 @@ module GBS
     end
 
     if ARG_PARAMS[0] == 'reload'
-        puts "Reloading..."
-        blaat = @gbs.reload_userdata()
-        puts " done! \n"
-        puts blaat
+        print "Reloading..."
+        reload = @gbs.reload_userdata()
+        if reload[:success] == "true"
+            print " done!"
+        else
+            print " FAIL!"
+        end
+        print "\n"
         Process.exit
     end
 
