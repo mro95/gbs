@@ -26,7 +26,7 @@ module GBS
             end
 
             def cmd_get_projects(client)
-                projects = ProjectManager.projects.map do |project|
+                projects = ProjectManager.projects.map do |filename, project|
                     {
                         name: project.name,
                         schedules: project.schedules,
@@ -64,15 +64,15 @@ module GBS
             end
 
             def cmd_run_task(client, project, task)
-                begin
+                #begin
                     running_task = ProjectManager.run(EnvironmentManager.best_available, project, task)
                     client.puts(running_task.to_json)
 
                     running_task.subscribe(client)
-                rescue => e
-                    puts e.message
-                    puts e.backtrace.inspect
-                end
+                #rescue => e
+                #    puts e.message
+                #    puts e.backtrace.inspect
+                #end
             end
 
             def cmd_running_tasks(client)
@@ -80,11 +80,10 @@ module GBS
             end
 
             def cmd_reload_userdata(client)
-                Userdata.reload()
+                ProjectManager.reload()
                 test = {
                     success: 'true'
                 }
-                ProjectManager.reload()
                 client.puts(test.to_json)
             end
 

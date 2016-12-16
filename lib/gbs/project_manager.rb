@@ -2,8 +2,18 @@ module GBS
     module ProjectManager
         def self.init
             @projects = Userdata.projects
-            @projects.each(&:register_schedules)
-
+            @projects.each do |f,p|
+                p.register_schedules
+            end
+            @running_tasks = []
+        end
+        
+        def self.reload
+            oldprojects = @projects
+            @projects = Userdata.reload(oldprojects)
+            @projects.each do |f,p|
+                p.register_schedules
+            end
             @running_tasks = []
         end
 
@@ -12,11 +22,11 @@ module GBS
         end
 
         def self.[](name)
-            @projects.find { |n| n.name == name }
+            @projects.find { |f,n| n.name == name }
         end
 
         def self.run(env, project, task)
-            running_task = self[project].run(env, task.to_sym)
+            running_task = self[project][1].run(env, task.to_sym)
             @running_tasks << running_task
 
             running_task
@@ -24,10 +34,6 @@ module GBS
 
         def self.running_tasks
             @running_tasks
-        end
-
-        def self.reload()
-            @projects = Userdata.projects
         end
 
         def self.shutdown

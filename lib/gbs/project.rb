@@ -45,6 +45,13 @@ module GBS
             }
         end
 
+        def reset
+            @name = ''
+            @repositories = []
+            @tasks = {}
+            @schedules = []
+        end
+
         ##
         # Load @data contents from disk.
         #
@@ -152,8 +159,9 @@ module GBS
         # +source::
         #   Ruby source code that describes the project using DSL.
         #
-        def initialize(source)
-            @project = Project.new
+        def initialize(source, project = nil)
+            @project = project || Project.new
+            @project.reset
             instance_eval(source)
         end
 
